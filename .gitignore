@@ -1,0 +1,4 @@
+venv/
+logs/
+MLOPS_PROJECT_5.egg-info/
+artifacts/raw

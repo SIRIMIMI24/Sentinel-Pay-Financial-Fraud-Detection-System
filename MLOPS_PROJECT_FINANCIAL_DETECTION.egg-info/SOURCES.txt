@@ -1,0 +1,10 @@
+setup.py
+MLOPS_PROJECT_FINANCIAL_DETECTION.egg-info/PKG-INFO
+MLOPS_PROJECT_FINANCIAL_DETECTION.egg-info/SOURCES.txt
+MLOPS_PROJECT_FINANCIAL_DETECTION.egg-info/dependency_links.txt
+MLOPS_PROJECT_FINANCIAL_DETECTION.egg-info/requires.txt
+MLOPS_PROJECT_FINANCIAL_DETECTION.egg-info/top_level.txt
+src/__init__.py
+src/custom_exception.py
+src/data_ingestion.py
+src/logger.py

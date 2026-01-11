@@ -1,0 +1,8 @@
+1. Create venv -> python -m venv venv
+2. activate venv -> venv\Scripts\activate
+3. instaill libraries -> pip install -e .
+4. Create data_ingestion.py
+5. Create data_processing.py
+6. Create data_model.py
+7. Tracking using MLFLOW and DAGSHUB
+   - run -> mlflow ui
