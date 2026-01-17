@@ -1,40 +1,41 @@
 import os
-import re
-from datetime import datetime
+import joblib
 import pandas as pd
 import numpy as np
-import joblib
+from datetime import datetime
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.feature_selection import SelectKBest, chi2, mutual_info_classif
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
+from sklearn.feature_selection import SelectKBest, mutual_info_classif
+
+# Mocking internal imports for the example
 from src.logger import get_logger
 from src.custom_exception import CustomException
-
-logger = get_logger(__name__)
 
 class DataProcessing:
     def __init__(self, input_path, output_path):
         self.input_path = input_path
         self.output_path = output_path
-        self.label_encoders = {}
-        self.scaler = StandardScaler()
+        # Unified preprocessor replaces individual encoders and scalers
+        self.preprocessor = None 
         self.df = None
         self.X = None
         self.y = None
         self.selected_features = []
 
         os.makedirs(self.output_path, exist_ok=True)
-        logger.info("DataProcessing initialized....")   
+        print("DataProcessing initialized....")
 
     def load_data(self):
         try:
             self.df = pd.read_csv(self.input_path)
-            logger.info("Data loaded sucesfully...")
+            print("Data loaded successfully...")
         except Exception as e:
-            logger.error(f"Error while loading data {e}")
-            raise CustomException("Failed to load data")
-    
+            raise Exception(f"Failed to load data: {e}")
+
     def preprocess_data(self):
+        """Clean raw data and generate derived features."""
         try:
             # 1. Handle In-place operations correctly
             self.df.drop_duplicates(inplace=True)
@@ -98,98 +99,88 @@ class DataProcessing:
                 "id", "transaction_id", "client_id", "card_id", "merchant_id",
                 "date", "expires", "year_pin_last_changed", "acct_open_date", 
                 "errors", "birth_year", "birth_month", "retirement_age", 
-                "per_capita_income", "num_credit_cards"
+                "per_capita_income", "num_credit_card"
             ]
             self.df.drop(columns=[c for c in drop_cols if c in self.df.columns], inplace=True)
 
             self.X = self.df.drop(columns=['is_fraud'])
             self.y = self.df['is_fraud']
-
-            # 9. Encoding (Categorical to Numerical)
-            # Note: Ensure age_bucket is handled as it is now a 'category' type
-            cat_features = self.X.select_dtypes(include=['object', 'category']).columns
-            for col in cat_features:
-                le = LabelEncoder()
-                self.X[col] = le.fit_transform(self.X[col].astype(str))
-                self.label_encoders[col] = le
-
-            logger.info("Data preprocessing completed successfully.")
-
+            
+            print("Data preprocessing (cleaning) completed.")
         except Exception as e:
-            logger.error(f"Error in preprocessing data: {e}")
-            raise CustomException("Data preprocessing failed")
+            raise Exception(f"Preprocessing failed: {e}")
 
     def feature_selection(self):
+        """Select top 10 features and identify their types for the preprocessor."""
         try:
-            # 1. Prevent Leakage: Use a temporary split for ranking
-            X_train_temp, _, y_train_temp, _ = train_test_split(
-                self.X, self.y, test_size=0.2, random_state=42, stratify=self.y
-            )
+            # Temporary encoding for Mutual Info calculation
+            X_tmp = self.X.copy()
+            for col in X_tmp.select_dtypes(include=['object', 'category']).columns:
+                X_tmp[col] = X_tmp[col].astype('category').cat.codes
 
-            # 2. Use Mutual Information (Handles continuous data + non-linearities)
-            # discrete_features: Identify indices of categorical columns for MI
-            discrete_mask = (X_train_temp.dtypes == 'int64') 
-            
             selector = SelectKBest(
                 score_func=lambda X, y: mutual_info_classif(X, y, random_state=42), 
                 k=10
             )
+            selector.fit(X_tmp, self.y)
             
-            selector.fit(X_train_temp, y_train_temp)
-            
-            # 3. Persist feature names rather than modifying self.X immediately
-            self.selected_features = X_train_temp.columns[selector.get_support()].tolist()
-            
-            # 4. Map back to the main dataset
+            self.selected_features = self.X.columns[selector.get_support()].tolist()
+            # Filter X to only the 10 MI features
             self.X = self.X[self.selected_features]
             
-            logger.info(f"Top 10 features selected via Mutual Info: {self.selected_features}")
-
+            print(f"Top 10 MI features: {self.selected_features}")
         except Exception as e:
-            logger.error(f"Feature Selection Error: {str(e)}")
-            raise e
-    
-    def split_and_scale_data(self):
+            raise Exception(f"Feature selection failed: {e}")
+
+    def split_and_build_pipeline(self):
+        """Construct the ColumnTransformer and transform data."""
         try:
-            X_train, X_test, y_train, y_test = train_test_split(self.X, self.y, test_size=0.2, random_state=42, stratify=self.y)
-            X_train = self.scaler.fit_transform(X_train)
-            X_test = self.scaler.transform(X_test)
+            X_train, X_test, y_train, y_test = train_test_split(
+                self.X, self.y, test_size=0.2, random_state=42, stratify=self.y
+            )
 
-            logger.info("Data splitting and scaling completed...")
+            # Identify column types automatically from selected features
+            cat_cols = X_train.select_dtypes(include=['object', 'category']).columns.tolist()
+            num_cols = X_train.select_dtypes(exclude=['object', 'category']).columns.tolist()
 
-            return X_train, X_test, y_train, y_test
-        
+            # Build unified preprocessor
+            self.preprocessor = ColumnTransformer(
+                transformers=[
+                    ('num', StandardScaler(), num_cols),
+                    ('cat', OneHotEncoder(handle_unknown='ignore', sparse_output=False), cat_cols)
+                ]
+            )
+
+            X_train_transformed = self.preprocessor.fit_transform(X_train)
+            X_test_transformed = self.preprocessor.transform(X_test)
+
+            return X_train_transformed, X_test_transformed, y_train, y_test
         except Exception as e:
-            logger.error(f"Error during data splitting and scaling: {e}")
-            raise CustomException("Failed to split and scale data")
-    
-    def save_data_scaler(self, X_train, X_test, y_train, y_test):
+            raise Exception(f"Pipeline construction failed: {e}")
+
+    def save_artifacts(self, X_train, X_test, y_train, y_test):
+        """Save the processed data and the unified preprocessor pkl."""
         try:
             joblib.dump(X_train, os.path.join(self.output_path, "X_train.pkl"))
             joblib.dump(X_test, os.path.join(self.output_path, "X_test.pkl"))
             joblib.dump(y_train, os.path.join(self.output_path, "y_train.pkl"))
             joblib.dump(y_test, os.path.join(self.output_path, "y_test.pkl"))
 
-            joblib.dump(self.scaler, os.path.join(self.output_path, "scaler.pkl"))
-
-            logger.info("Data and scaler saved successfully...")
-        
+            # Save the preprocessor that Flask will use
+            joblib.dump(self.preprocessor, os.path.join(self.output_path, "preprocessor.pkl"))
+            print("All artifacts saved successfully.")
         except Exception as e:
-            logger.error(f"Error while saving data/scaler: {e}")
-            raise CustomException("Failed to save data/scaler")
-    
+            raise Exception(f"Saving artifacts failed: {e}")
+
     def run(self):
         self.load_data()
         self.preprocess_data()
         self.feature_selection()
-        X_train, X_test, y_train, y_test = self.split_and_scale_data()
-        self.save_data_scaler(X_train, X_test, y_train, y_test)
-
-        logger.info("Data processing pipelinecompleted successfully...")
+        X_train, X_test, y_train, y_test = self.split_and_build_pipeline()
+        self.save_artifacts(X_train, X_test, y_train, y_test)
 
 if __name__ == "__main__":
     input_path = "artifacts/raw/data_financial_detection.csv"
     output_path = "artifacts/processed"
-
     processor = DataProcessing(input_path, output_path)
     processor.run()

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>SentinelPay | Financial Security Scan</title>
+    <link rel="stylesheet" href="../static/styles.css">
+</head>
+<body>
+    <div class="card">
+        <h1 style="text-align: center;">🔐 SentinelPay Risk Scan</h1>
+        
+        <form action="/predict" method="POST">
+            <div class="grid-2">
+                <div class="input-box">
+                    <label>Use Chip</label>
+                    <select name="use_chip">
+                        <option value="Chip Transaction">Chip</option>
+                        <option value="Swipe Transaction">Swipe</option>
+                        <option value="Online Transaction">Online</option>
+                    </select>
+                </div>
+                <div class="input-box">
+                    <label>Merchant State</label>
+                    <input type="text" name="merchant_state" placeholder="e.g. CA" required>
+                </div>
+                <div class="input-box">
+                    <label>Card Brand</label>
+                    <select name="card_brand">
+                        <option value="Visa">Visa</option>
+                        <option value="Mastercard">Mastercard</option>
+                    </select>
+                </div>
+                <div class="input-box">
+                    <label>Card Type</label>
+                    <select name="card_type">
+                        <option value="Credit">Credit</option>
+                        <option value="Debit">Debit</option>
+                    </select>
+                </div>
+                <div class="input-box">
+                    <label>Has Chip?</label>
+                    <select name="has_chip">
+                        <option value="1">Yes</option>
+                        <option value="0">No</option>
+                    </select>
+                </div>
+                <div class="input-box">
+                    <label>Cards Issued</label>
+                    <input type="number" name="num_cards_issued" value="1">
+                </div>
+                <div class="input-box">
+                    <label>Gender</label>
+                    <select name="gender">
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                    </select>
+                </div>
+                <div class="input-box">
+                    <label>Day of Week (0-6)</label>
+                    <input type="number" name="txn_dayofweek" min="0" max="6" value="0">
+                </div>
+                <div class="input-box">
+                    <label>Days Since PIN Change</label>
+                    <input type="number" name="days_since_pin_change" required>
+                </div>
+                <div class="input-box">
+                    <label>Age Bucket</label>
+                    <select name="age_bucket">
+                        <option value="<25">&lt;25</option>
+                        <option value="25-40">25-40</option>
+                        <option value="40-60">40-60</option>
+                        <option value="60-100">60-100</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn-primary">Execute Fraud Scan</button>
+            </div>
+        </form>
+
+        {% if prediction %}
+        <div class="alert {{ status_class }}">
+            <h2>Result: {{ prediction }}</h2>
+            <p>Calculated Probability: {{ probability }}</p>
+        </div>
+        {% endif %}
+    </div>
+</body>
+</html>
