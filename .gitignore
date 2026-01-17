@@ -1,4 +1,20 @@
+# 1. Environments & System
 venv/
+.env
+__pycache__/
+
+# 2. Project Metadata
+*.egg-info/
+mlflow_setup.txt
+
+# 3. Artifacts (Ignore ทั้งโฟลเดอร์)
+artifacts/
 logs/
-MLOPS_PROJECT_5.egg-info/
-artifacts/raw
+
+# 4. Notebook Outputs & Data (ใช้ Wildcards)
+notebook/*.pkl
+notebook/*.csv
+notebook/*.png
+
+# 5. MLflow Tracking
+mlruns/
